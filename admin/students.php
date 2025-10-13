@@ -55,6 +55,8 @@ if (isset($_GET['delete'])) {
 $search = $_GET['search'] ?? '';
 $class_filter = $_GET['class_filter'] ?? '';
 $grade_filter = $_GET['grade_filter'] ?? '';
+$school_year_filter = $_GET['school_year_filter'] ?? ''; // 🔸 THÊM MỚI
+$show_inactive = isset($_GET['show_inactive']); // 🔸 THÊM MỚI
 
 // Xây dựng câu truy vấn với bộ lọc
 $sql = "
@@ -62,8 +64,13 @@ $sql = "
     FROM users u 
     LEFT JOIN class_students cs ON u.id = cs.student_id 
     LEFT JOIN classes c ON cs.class_id = c.id 
-    WHERE u.role = 'student' AND u.status = 'active'
+    WHERE u.role = 'student'
 ";
+
+// 🔸 Nếu không tick “hiển thị học sinh đã nghỉ học” thì chỉ lấy active
+if (!$show_inactive) {
+    $sql .= " AND u.status = 'active'";
+}
 
 $params = [];
 
@@ -87,6 +94,12 @@ if (!empty($grade_filter)) {
     $params[] = $grade_filter;
 }
 
+// 🔸 Thêm điều kiện lọc theo năm học
+if (!empty($school_year_filter)) {
+    $sql .= " AND cs.school_year = ?";
+    $params[] = $school_year_filter;
+}
+
 $sql .= " ORDER BY c.class_name, u.full_name";
 
 // Thực thi truy vấn
@@ -101,6 +114,10 @@ $classes = $stmt->fetchAll();
 // Lấy danh sách khối lớp duy nhất
 $stmt = $pdo->query("SELECT DISTINCT grade FROM classes WHERE grade IS NOT NULL ORDER BY grade");
 $grades = $stmt->fetchAll();
+
+// 🔸 Lấy danh sách năm học duy nhất từ class_students
+$stmt = $pdo->query("SELECT DISTINCT school_year FROM class_students ORDER BY school_year DESC");
+$school_years = $stmt->fetchAll(PDO::FETCH_COLUMN);
 ?>
 
 <!DOCTYPE html>
@@ -143,41 +160,55 @@ $grades = $stmt->fetchAll();
                     </div>
                     <div class="card-body">
                         <form method="GET" class="row g-3">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label">Tìm kiếm theo tên</label>
                                 <input type="text" class="form-control" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Nhập tên hoặc mã học sinh...">
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Lọc theo khối</label>
+                            <div class="col-md-2">
+                                <label class="form-label">Khối</label>
                                 <select class="form-select" name="grade_filter">
                                     <option value="">Tất cả khối</option>
                                     <?php foreach ($grades as $grade): ?>
-                                        <option value="<?php echo htmlspecialchars($grade['grade']); ?>" 
-                                            <?php echo $grade_filter == $grade['grade'] ? 'selected' : ''; ?>>
+                                        <option value="<?php echo htmlspecialchars($grade['grade']); ?>" <?php echo $grade_filter == $grade['grade'] ? 'selected' : ''; ?>>
                                             Khối <?php echo htmlspecialchars($grade['grade']); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Lọc theo lớp</label>
+                            <div class="col-md-2">
+                                <label class="form-label">Lớp</label>
                                 <select class="form-select" name="class_filter">
                                     <option value="">Tất cả lớp</option>
                                     <?php foreach ($classes as $class): ?>
-                                        <option value="<?php echo $class['id']; ?>" 
-                                            <?php echo $class_filter == $class['id'] ? 'selected' : ''; ?>>
+                                        <option value="<?php echo $class['id']; ?>" <?php echo $class_filter == $class['id'] ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($class['class_name']); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <div class="col-md-2">
+                                <!-- 🔸 Bộ lọc năm học -->
+                                <label class="form-label">Năm học</label>
+                                <select class="form-select" name="school_year_filter">
+                                    <option value="">Tất cả</option>
+                                    <?php foreach ($school_years as $year): ?>
+                                        <option value="<?php echo htmlspecialchars($year); ?>" <?php echo $school_year_filter == $year ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($year); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                             <div class="col-md-2 d-flex align-items-end">
-                                <button type="submit" class="btn btn-primary me-2">
-                                    <i class="fas fa-search"></i> Lọc
+                                <div class="form-check">
+                                    <!-- 🔸 Checkbox hiển thị học sinh đã nghỉ -->
+                                    <input class="form-check-input" type="checkbox" name="show_inactive" id="showInactive" <?php echo $show_inactive ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="showInactive">Hiển thị HS nghỉ học</label>
+                                </div>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-search"></i>
                                 </button>
-                                <a href="students.php" class="btn btn-secondary">
-                                    <i class="fas fa-refresh"></i> Reset
-                                </a>
                             </div>
                         </form>
                     </div>
