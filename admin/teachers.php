@@ -37,9 +37,17 @@ if (isset($_GET['delete'])) {
     exit();
 }
 
+
 // Lấy danh sách giáo viên
-$stmt = $pdo->query("SELECT * FROM users WHERE role = 'teacher' AND status = 'active' ORDER BY full_name");
+$show_all = isset($_GET['show_all']) && $_GET['show_all'] == '1';
+
+if ($show_all) {
+    $stmt = $pdo->query("SELECT * FROM users WHERE role = 'teacher' ORDER BY status DESC, full_name");
+} else {
+    $stmt = $pdo->query("SELECT * FROM users WHERE role = 'teacher' AND status = 'active' ORDER BY full_name");
+}
 $teachers = $stmt->fetchAll();
+
 ?>
 
 <!DOCTYPE html>
@@ -62,6 +70,11 @@ $teachers = $stmt->fetchAll();
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-chalkboard-teacher"></i> Quản lý Giáo viên</h1>
+                    <div class="form-check form-switch ms-3">
+                        <input class="form-check-input" type="checkbox" id="showAll" <?php echo $show_all ? 'checked' : ''; ?>>
+                        <label class="form-check-label" for="showAll">Hiển thị toàn bộ giáo viên</label>
+                    </div>
+
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTeacherModal">
                         <i class="fas fa-plus"></i> Thêm Giáo viên
                     </button>
@@ -85,6 +98,7 @@ $teachers = $stmt->fetchAll();
                                         <th>Họ tên</th>
                                         <th>Email</th>
                                         <th>Điện thoại</th>
+                                        <th>Trạng thái</th>
                                         <th>Ngày tạo</th>
                                         <th>Thao tác</th>
                                     </tr>
@@ -96,8 +110,22 @@ $teachers = $stmt->fetchAll();
                                         <td><?php echo htmlspecialchars($teacher['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($teacher['email']); ?></td>
                                         <td><?php echo htmlspecialchars($teacher['phone']); ?></td>
+                                        <td>
+                                            <?php if ($teacher['status'] === 'active'): ?>
+                                                <span class="badge bg-success">Đang giảng dạy</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary">Ngừng giảng dạy</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?php echo date('d/m/Y', strtotime($teacher['created_at'])); ?></td>
                                         <td>
+                                            <!-- Nút đổi trạng thái -->
+                                            <a href="teachers.php?toggle_status=<?php echo $teacher['id']; ?><?php echo $show_all ? '&show_all=1' : ''; ?>"
+                                                class="btn btn-sm <?php echo $teacher['status'] === 'active' ? 'btn-outline-danger' : 'btn-outline-success'; ?>"
+                                                onclick="return confirm('Bạn có chắc muốn <?php echo $teacher['status'] === 'active' ? 'ngừng giảng dạy' : 'kích hoạt lại'; ?> giáo viên này?')">
+                                                    <i class="fas <?php echo $teacher['status'] === 'active' ? 'fa-ban' : 'fa-check'; ?>"></i>
+                                                    <?php echo $teacher['status'] === 'active' ? 'Ngừng dạy' : 'Kích hoạt'; ?>
+                                            </a>
                                             <a href="edit_teacher.php?id=<?php echo $teacher['id']; ?>" class="btn btn-sm btn-warning">
                                                 <i class="fas fa-edit"></i>
                                             </a>
@@ -112,6 +140,7 @@ $teachers = $stmt->fetchAll();
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+
                         </div>
                     </div>
                 </div>
@@ -172,5 +201,12 @@ $teachers = $stmt->fetchAll();
             });
         });
     </script>
+    <script>
+        document.getElementById('showAll').addEventListener('change', function() {
+            const checked = this.checked ? '1' : '0';
+            window.location.href = 'teachers.php?show_all=' + checked;
+        });
+    </script>
+
 </body>
 </html>
