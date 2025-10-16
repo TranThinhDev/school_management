@@ -37,6 +37,64 @@ if (isset($_GET['delete'])) {
     exit();
 }
 
+// Xử lý đổi trạng thái giáo viên
+if (isset($_GET['toggle_status'])) {
+    $teacher_id = $_GET['toggle_status'];
+
+    try {
+        // Lấy trạng thái hiện tại của giáo viên
+        $stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? AND role = 'teacher'");
+        $stmt->execute([$teacher_id]);
+        $teacher = $stmt->fetch();
+
+        if ($teacher) {
+            $current_status = $teacher['status'];
+            $new_status = ($current_status === 'active') ? 'inactive' : 'active';
+
+            // ✅ Nếu chuyển sang "inactive" thì kiểm tra ràng buộc bàn giao
+            if ($new_status === 'inactive') {
+
+                // Kiểm tra còn lớp đang giảng dạy không
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) FROM teaching_assignments
+                    WHERE teacher_id = ? AND (end_date IS NULL OR end_date > NOW())
+                ");
+                $stmt->execute([$teacher_id]);
+                $teaching_count = $stmt->fetchColumn();
+
+                // Kiểm tra còn chủ nhiệm lớp nào không
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) FROM homeroom_history
+                    WHERE teacher_id = ? AND (end_date IS NULL OR end_date > NOW())
+                ");
+                $stmt->execute([$teacher_id]);
+                $homeroom_count = $stmt->fetchColumn();
+
+                if ($teaching_count > 0 || $homeroom_count > 0) {
+                    $_SESSION['error'] = "Không thể chuyển giáo viên sang trạng thái 'ngừng giảng dạy'. 
+                    Vui lòng hoàn tất bàn giao giảng dạy và chủ nhiệm trước khi ngừng công tác.";
+                    header("Location: teachers.php" . (isset($_GET['show_all']) ? '?show_all=' . $_GET['show_all'] : ''));
+                    exit();
+                }
+            }
+
+            // ✅ Nếu không vi phạm, cho phép đổi trạng thái
+            $stmt = $pdo->prepare("UPDATE users SET status = ? WHERE id = ?");
+            $stmt->execute([$new_status, $teacher_id]);
+
+            $_SESSION['success'] = "Cập nhật trạng thái giáo viên thành công!";
+        } else {
+            $_SESSION['error'] = "Không tìm thấy giáo viên!";
+        }
+    } catch (Exception $e) {
+        $_SESSION['error'] = "Lỗi: " . $e->getMessage();
+    }
+
+    header("Location: teachers.php" . (isset($_GET['show_all']) ? '?show_all=' . $_GET['show_all'] : ''));
+    exit();
+}
+
+
 
 // Lấy danh sách giáo viên
 $show_all = isset($_GET['show_all']) && $_GET['show_all'] == '1';
