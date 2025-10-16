@@ -11,6 +11,19 @@ $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$teacher_id]);
 $teacher = $stmt->fetch();
 
+// 🆕 Lấy danh sách lớp chủ nhiệm
+$stmt = $pdo->prepare("
+    SELECT id, class_name, grade, school_year 
+    FROM classes 
+    WHERE homeroom_teacher_id = ?
+    ORDER BY school_year DESC
+");
+$stmt->execute([$teacher_id]);
+$homeroom_classes = $stmt->fetchAll();
+
+// 🆕 Tổng số lớp chủ nhiệm
+$total_homeroom = count($homeroom_classes);
+
 // Lấy số lớp đang dạy
 $stmt = $pdo->prepare("
     SELECT COUNT(DISTINCT class_id) as total 
@@ -50,6 +63,17 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$teacher_id]);
 $recent_assignments = $stmt->fetchAll();
+
+// 🆕 Lấy danh sách lớp chủ nhiệm gần đây
+$stmt = $pdo->prepare("
+    SELECT id, class_name, grade, school_year 
+    FROM classes 
+    WHERE homeroom_teacher_id = ?
+    ORDER BY school_year DESC 
+    LIMIT 5
+");
+$stmt->execute([$teacher_id]);
+$recent_homeroom_classes = $stmt->fetchAll();
 
 // Kiểm tra hạn nhập điểm sắp đến
 $current_date = date('Y-m-d');
@@ -283,6 +307,25 @@ $recent_announcements = $stmt->fetchAll();
                     </div>
 
                     <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card stats-card border-left-primary shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                            Lớp chủ nhiệm
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $total_homeroom; ?></div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-user-tie fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="col-xl-3 col-md-6 mb-4">
                         <div class="card stats-card border-left-info shadow h-100 py-2">
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
@@ -380,6 +423,49 @@ $recent_announcements = $stmt->fetchAll();
                     <!-- Thông báo mới nhất -->
                   
                 </div>
+
+                <!-- 🆕 Lớp chủ nhiệm gần đây -->
+                <?php if ($recent_homeroom_classes): ?>
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-success">
+                            <i class="fas fa-users"></i> Lớp chủ nhiệm gần đây
+                        </h6>
+                        <a href="homeroom_classes.php" class="btn btn-sm btn-success">Xem tất cả</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Tên lớp</th>
+                                        <th>Khối</th>
+                                        <th>Năm học</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($recent_homeroom_classes as $class): ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($class['class_name']); ?></strong></td>
+                                        <td>Khối <?php echo htmlspecialchars($class['grade']); ?></td>
+                                        <td><small class="text-muted"><?php echo htmlspecialchars($class['school_year']); ?></small></td>
+                                        <td>
+                                            <a href="students.php?class=<?php echo $class['id']; ?>" 
+                                            class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-users"></i> Danh sách HS
+                                            </a>
+                                        </td>
+
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
             </main>
         </div>
     </div>

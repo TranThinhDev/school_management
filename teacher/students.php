@@ -275,10 +275,11 @@ if ($selected_class) {
                                                 </td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm">
-                                                        <a href="scores.php?class=<?php echo $selected_class; ?>&student=<?php echo $student['id']; ?>" 
-                                                           class="btn btn-info" title="Xem điểm chi tiết">
+                                                        <a href="student_scores_detail.php?student=<?php echo $student['id']; ?>&class=<?php echo $selected_class; ?>" 
+                                                          class="btn btn-info" title="Xem bảng điểm chi tiết">
                                                             <i class="fas fa-chart-line"></i>
                                                         </a>
+
                                                         <button type="button" class="btn btn-primary" 
                                                                 data-bs-toggle="modal" 
                                                                 data-bs-target="#studentDetailModal"
