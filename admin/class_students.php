@@ -142,12 +142,23 @@ if (isset($_POST['update_status'])) {
     $new_status = $_POST['new_status'];
 
     try {
+        // Cập nhật trạng thái trong bảng class_students
         $stmt = $pdo->prepare("
             UPDATE class_students 
             SET status = ? 
             WHERE student_id = ? AND class_id = ? AND school_year = ?
         ");
         $stmt->execute([$new_status, $student_id, $class_id, $class['school_year']]);
+
+        // 🔸 Nếu học sinh nghỉ học hoặc tốt nghiệp thì cập nhật luôn trong bảng users
+        if (in_array($new_status, ['graduated', 'dropped'])) {
+            $stmt = $pdo->prepare("UPDATE users SET status = 'inactive' WHERE id = ? AND role = 'student'");
+            $stmt->execute([$student_id]);
+        } else {
+            // 🔸 Nếu học sinh quay lại học (active lại), thì cập nhật users.status = 'active'
+            $stmt = $pdo->prepare("UPDATE users SET status = 'active' WHERE id = ? AND role = 'student'");
+            $stmt->execute([$student_id]);
+        }
 
         $_SESSION['success'] = "Cập nhật trạng thái học sinh thành công!";
         header("Location: class_students.php?id=" . $class_id);
@@ -156,6 +167,7 @@ if (isset($_POST['update_status'])) {
         $_SESSION['error'] = "Lỗi: " . $e->getMessage();
     }
 }
+
 
 
 ?>
