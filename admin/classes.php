@@ -200,9 +200,6 @@ $teachers = $stmt->fetchAll();
                                             <a href="edit_class.php?id=<?php echo $class['id']; ?>" class="btn btn-sm btn-warning">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="classes.php?delete=<?php echo $class['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc chắn muốn xóa?')">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
                                             <a href="#" 
                                                 class="btn btn-sm btn-secondary" 
                                                 data-bs-toggle="modal" 

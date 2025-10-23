@@ -187,9 +187,6 @@ $teachers = $stmt->fetchAll();
                                             <a href="edit_teacher.php?id=<?php echo $teacher['id']; ?>" class="btn btn-sm btn-warning">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="teachers.php?delete=<?php echo $teacher['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc chắn muốn xóa?')">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
                                             <a href="teacher_assignments.php?id=<?php echo $teacher['id']; ?>" class="btn btn-sm btn-info">
                                                 <i class="fas fa-tasks"></i>
                                             </a>
