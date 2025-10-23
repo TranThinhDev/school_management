@@ -6,14 +6,18 @@ checkRole(['teacher']);
 
 $teacher_id = $_SESSION['user_id'];
 
-// Xử lý đánh dấu đã đọc khi xem chi tiết
+// 🟢 Bộ lọc: all / unread / read
+$filter = $_GET['filter'] ?? 'all';
+
+// 🟢 Xử lý đánh dấu đã đọc khi xem chi tiết
 if (isset($_GET['view'])) {
     $announcement_id = $_GET['view'];
     
-    // Đánh dấu đã đọc
+    // Cập nhật viewed_at thay vì chỉ insert
     $stmt = $pdo->prepare("
-        INSERT IGNORE INTO announcement_views (announcement_id, user_id) 
-        VALUES (?, ?)
+        INSERT INTO announcement_views (announcement_id, user_id, viewed_at)
+        VALUES (?, ?, NOW())
+        ON DUPLICATE KEY UPDATE viewed_at = NOW()
     ");
     $stmt->execute([$announcement_id, $teacher_id]);
     
@@ -36,47 +40,61 @@ if (isset($_GET['view'])) {
     }
 }
 
-// Lấy danh sách thông báo với trạng thái đã đọc - ƯU TIÊN CHƯA ĐỌC LÊN ĐẦU
+// 🟢 Xử lý bộ lọc hiển thị
+$filter_condition = "";
+if ($filter === 'unread') {
+    $filter_condition = "AND av.id IS NULL";
+} elseif ($filter === 'read') {
+    $filter_condition = "AND av.id IS NOT NULL";
+}
+
+// 🟢 Lấy danh sách thông báo
 $stmt = $pdo->prepare("
-    SELECT a.*, u.full_name as author_name, 
-           CASE WHEN av.viewed_at IS NOT NULL THEN 1 ELSE 0 END as is_read
-    FROM announcements a 
-    JOIN users u ON a.author_id = u.id 
-    LEFT JOIN announcement_views av ON a.id = av.announcement_id AND av.user_id = ?
+    SELECT a.*, u.full_name as author_name,
+           av.viewed_at,
+           CASE WHEN av.viewed_at IS NOT NULL THEN 1 ELSE 0 END AS is_read
+    FROM announcements a
+    JOIN users u ON a.author_id = u.id
+    LEFT JOIN announcement_views av 
+        ON a.id = av.announcement_id AND av.user_id = ?
     WHERE (a.target_audience = 'all' OR a.target_audience = 'teachers')
-    AND a.is_active = TRUE
+      AND a.is_active = TRUE
+      $filter_condition
     ORDER BY 
-        is_read ASC,  -- Ưu tiên chưa đọc (0) lên đầu, đã đọc (1) xuống dưới
-        a.created_at DESC  -- Sau đó sắp xếp theo thời gian mới nhất
+        is_read ASC, 
+        a.created_at DESC
 ");
 $stmt->execute([$teacher_id]);
 $announcements = $stmt->fetchAll();
 
-// Đếm số thông báo mới (chưa đọc trong 7 ngày)
+// 🟢 Đếm tổng chưa đọc
 $stmt = $pdo->prepare("
     SELECT COUNT(*) as total 
     FROM announcements a
-    LEFT JOIN announcement_views av ON a.id = av.announcement_id AND av.user_id = ?
+    LEFT JOIN announcement_views av 
+        ON a.id = av.announcement_id AND av.user_id = ?
     WHERE (a.target_audience = 'all' OR a.target_audience = 'teachers')
-    AND a.is_active = TRUE
-    AND a.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-    AND av.id IS NULL
-");
-$stmt->execute([$teacher_id]);
-$new_announcements_count = $stmt->fetch()['total'];
-
-// Đếm tổng số thông báo chưa đọc
-$stmt = $pdo->prepare("
-    SELECT COUNT(*) as total 
-    FROM announcements a
-    LEFT JOIN announcement_views av ON a.id = av.announcement_id AND av.user_id = ?
-    WHERE (a.target_audience = 'all' OR a.target_audience = 'teachers')
-    AND a.is_active = TRUE
-    AND av.id IS NULL
+      AND a.is_active = TRUE
+      AND av.id IS NULL
 ");
 $stmt->execute([$teacher_id]);
 $total_unread = $stmt->fetch()['total'];
+
+// 🟢 Đếm số thông báo mới trong 7 ngày
+$stmt = $pdo->prepare("
+    SELECT COUNT(*) as total 
+    FROM announcements a
+    LEFT JOIN announcement_views av 
+        ON a.id = av.announcement_id AND av.user_id = ?
+    WHERE (a.target_audience = 'all' OR a.target_audience = 'teachers')
+      AND a.is_active = TRUE
+      AND a.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+      AND av.id IS NULL
+");
+$stmt->execute([$teacher_id]);
+$new_announcements_count = $stmt->fetch()['total'];
 ?>
+
 
 <!DOCTYPE html>
 <html lang="vi">

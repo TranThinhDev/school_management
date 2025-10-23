@@ -6,14 +6,18 @@ checkRole(['student']);
 
 $student_id = $_SESSION['user_id'];
 
-// Xử lý đánh dấu đã đọc khi xem chi tiết
+// 🟢 Bộ lọc: all / unread / read
+$filter = $_GET['filter'] ?? 'all';
+
+// 🟢 Xử lý đánh dấu đã đọc khi xem chi tiết
 if (isset($_GET['view'])) {
     $announcement_id = $_GET['view'];
     
-    // Đánh dấu đã đọc
+    // Cập nhật viewed_at thay vì chỉ insert
     $stmt = $pdo->prepare("
-        INSERT IGNORE INTO announcement_views (announcement_id, user_id) 
-        VALUES (?, ?)
+        INSERT INTO announcement_views (announcement_id, user_id, viewed_at)
+        VALUES (?, ?, NOW())
+        ON DUPLICATE KEY UPDATE viewed_at = NOW()
     ");
     $stmt->execute([$announcement_id, $student_id]);
     
@@ -36,34 +40,61 @@ if (isset($_GET['view'])) {
     }
 }
 
-// Lấy danh sách thông báo với trạng thái đã đọc - ƯU TIÊN CHƯA ĐỌC LÊN ĐẦU
+// 🟢 Xử lý bộ lọc hiển thị
+$filter_condition = "";
+if ($filter === 'unread') {
+    $filter_condition = "AND av.id IS NULL";
+} elseif ($filter === 'read') {
+    $filter_condition = "AND av.id IS NOT NULL";
+}
+
+// 🟢 Lấy danh sách thông báo
 $stmt = $pdo->prepare("
-    SELECT a.*, u.full_name as author_name, 
-           CASE WHEN av.viewed_at IS NOT NULL THEN 1 ELSE 0 END as is_read
-    FROM announcements a 
-    JOIN users u ON a.author_id = u.id 
-    LEFT JOIN announcement_views av ON a.id = av.announcement_id AND av.user_id = ?
+    SELECT a.*, u.full_name as author_name,
+           av.viewed_at,
+           CASE WHEN av.viewed_at IS NOT NULL THEN 1 ELSE 0 END AS is_read
+    FROM announcements a
+    JOIN users u ON a.author_id = u.id
+    LEFT JOIN announcement_views av 
+        ON a.id = av.announcement_id AND av.user_id = ?
     WHERE (a.target_audience = 'all' OR a.target_audience = 'students')
-    AND a.is_active = TRUE
+      AND a.is_active = TRUE
+      $filter_condition
     ORDER BY 
-        is_read ASC,
+        is_read ASC, 
         a.created_at DESC
 ");
 $stmt->execute([$student_id]);
 $announcements = $stmt->fetchAll();
 
-// Đếm tổng số thông báo chưa đọc
+// 🟢 Đếm tổng chưa đọc
 $stmt = $pdo->prepare("
     SELECT COUNT(*) as total 
     FROM announcements a
-    LEFT JOIN announcement_views av ON a.id = av.announcement_id AND av.user_id = ?
+    LEFT JOIN announcement_views av 
+        ON a.id = av.announcement_id AND av.user_id = ?
     WHERE (a.target_audience = 'all' OR a.target_audience = 'students')
-    AND a.is_active = TRUE
-    AND av.id IS NULL
+      AND a.is_active = TRUE
+      AND av.id IS NULL
 ");
 $stmt->execute([$student_id]);
 $total_unread = $stmt->fetch()['total'];
+
+// 🟢 Đếm số thông báo mới trong 7 ngày
+$stmt = $pdo->prepare("
+    SELECT COUNT(*) as total 
+    FROM announcements a
+    LEFT JOIN announcement_views av 
+        ON a.id = av.announcement_id AND av.user_id = ?
+    WHERE (a.target_audience = 'all' OR a.target_audience = 'students')
+      AND a.is_active = TRUE
+      AND a.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+      AND av.id IS NULL
+");
+$stmt->execute([$student_id]);
+$new_announcements_count = $stmt->fetch()['total'];
 ?>
+
 
 <!DOCTYPE html>
 <html lang="vi">
@@ -143,7 +174,7 @@ $total_unread = $stmt->fetch()['total'];
     <div class="container-fluid">
         <div class="row">
             <?php include 'sidebar.php'; ?>
-
+            
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">
@@ -153,7 +184,8 @@ $total_unread = $stmt->fetch()['total'];
                         <?php endif; ?>
                     </h1>
                     <div class="btn-group">
-                        
+                        <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter"></i> Lọc
                         </button>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="?filter=all">Tất cả</a></li>
@@ -392,7 +424,7 @@ $total_unread = $stmt->fetch()['total'];
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Cập nhật giao diện
+                        // Cập nhật giao diện - di chuyển thông báo từ phần chưa đọc sang đã đọc
                         moveToReadSection(announcementId);
                     }
                 })
@@ -408,10 +440,16 @@ $total_unread = $stmt->fetch()['total'];
                 card.classList.add('read-announcement');
                 
                 // Cập nhật badge
-                const badge = card.querySelector('.badge.bg-success');
+                const badge = card.querySelector('.badge.bg-success, .badge.bg-danger');
                 if (badge) {
                     badge.textContent = 'ĐÃ ĐỌC';
                     badge.className = 'badge bg-secondary status-badge ms-2';
+                }
+                
+                // Di chuyển card đến phần đã đọc
+                const readSection = document.querySelector('.section-divider + div .row');
+                if (readSection) {
+                    readSection.appendChild(card.parentElement);
                 }
                 
                 // Cập nhật số lượng
@@ -428,6 +466,15 @@ $total_unread = $stmt->fetch()['total'];
                     badge.textContent = (currentCount - 1) + ' chưa đọc';
                 } else {
                     badge.remove();
+                    
+                    // Ẩn tiêu đề phần chưa đọc nếu không còn thông báo nào
+                    const unreadSection = document.querySelector('.section-divider');
+                    if (unreadSection) {
+                        const unreadCards = unreadSection.querySelectorAll('.announcement-card');
+                        if (unreadCards.length === 0) {
+                            unreadSection.remove();
+                        }
+                    }
                 }
             }
         }
@@ -442,6 +489,15 @@ $total_unread = $stmt->fetch()['total'];
                 });
             });
         });
+
+        // Tự động đóng alert sau 5 giây
+        setTimeout(function() {
+            const alert = document.querySelector('.alert');
+            if (alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }
+        }, 5000);
     </script>
 </body>
 </html>
