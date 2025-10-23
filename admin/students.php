@@ -64,7 +64,7 @@ $sql = "
     FROM users u 
     LEFT JOIN class_students cs ON u.id = cs.student_id 
     LEFT JOIN classes c ON cs.class_id = c.id 
-    WHERE u.role = 'student'
+    WHERE u.role = 'student' and cs.status = 'active'
 ";
 
 // 🔸 Nếu không tick “hiển thị học sinh đã nghỉ học” thì chỉ lấy active
@@ -243,6 +243,7 @@ $school_years = $stmt->fetchAll(PDO::FETCH_COLUMN);
                                         <th>Họ tên</th>
                                         <th>Khối</th>
                                         <th>Lớp</th>
+                                        <th>Năm học</th>
                                         <th>Email</th>
                                         <th>Điện thoại</th>
                                         <th>Ngày tạo</th>
@@ -262,6 +263,7 @@ $school_years = $stmt->fetchAll(PDO::FETCH_COLUMN);
                                             <?php endif; ?>
                                         </td>
                                         <td><?php echo htmlspecialchars($student['class_name'] ?? 'Chưa xếp lớp'); ?></td>
+                                        <td><?php echo htmlspecialchars($student['school_year'] ?? '-'); ?></td>
                                         <td><?php echo htmlspecialchars($student['email']); ?></td>
                                         <td><?php echo htmlspecialchars($student['phone']); ?></td>
                                         <td><?php echo date('d/m/Y', strtotime($student['created_at'])); ?></td>
@@ -272,7 +274,7 @@ $school_years = $stmt->fetchAll(PDO::FETCH_COLUMN);
                                             <a href="students.php?delete=<?php echo $student['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc chắn muốn xóa?')">
                                                 <i class="fas fa-trash"></i>
                                             </a>
-                                            <a href="student_scores.php?id=<?php echo $student['id']; ?>" class="btn btn-sm btn-info">
+                                            <a href="student_scores.php?id=<?php echo $student['id']; ?>&school_year=<?php echo urlencode($student['school_year']); ?>" class="btn btn-sm btn-info">
                                                 <i class="fas fa-chart-line"></i>
                                             </a>
                                         </td>

@@ -152,7 +152,8 @@ $assignments = $stmt->fetchAll();
 
 // Lấy danh sách giáo viên, lớp, môn học (dùng cho form thêm & modal đổi)
 $teachers = $pdo->query("SELECT id, full_name FROM users WHERE role = 'teacher' AND status = 'active' ORDER BY full_name")->fetchAll();
-$classes = $pdo->query("SELECT id, class_name, grade FROM classes ORDER BY grade, class_name")->fetchAll();
+// Không lọc trước, sẽ load qua AJAX sau
+$classes = [];
 $subjects = $pdo->query("SELECT id, subject_name FROM subjects ORDER BY subject_name")->fetchAll();
 ?>
 
@@ -316,7 +317,7 @@ $subjects = $pdo->query("SELECT id, subject_name FROM subjects ORDER BY subject_
 
                         <div class="mb-3">
                             <label class="form-label">Lớp *</label>
-                            <select class="form-select" name="class_id" required>
+                            <select class="form-select" name="class_id" id="classSelect" required>
                                 <option value="">Chọn lớp</option>
                                 <?php foreach ($classes as $class): ?>
                                     <option value="<?php echo $class['id']; ?>">
@@ -348,7 +349,7 @@ $subjects = $pdo->query("SELECT id, subject_name FROM subjects ORDER BY subject_
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Năm học *</label>
-                                <select class="form-select" name="school_year" required>
+                                <select class="form-select" name="school_year" id="yearSelect" required>
                                     <?php if (!empty($school_years)): ?>
                                         <?php foreach ($school_years as $y): ?>
                                             <option value="<?php echo htmlspecialchars($y); ?>"><?php echo htmlspecialchars($y); ?></option>
@@ -439,6 +440,44 @@ $subjects = $pdo->query("SELECT id, subject_name FROM subjects ORDER BY subject_
       document.getElementById('className').textContent = className;
       document.getElementById('subjectName').textContent = subjectName;
     });
+    // Gọi tự động khi modal mở
+    $('#addAssignmentModal').on('shown.bs.modal', function () {
+        const evt = new Event('change');
+        document.getElementById('yearSelect').dispatchEvent(evt);
+    });
+    // Khi chọn năm học -> tự động load danh sách lớp
+    document.addEventListener("DOMContentLoaded", function() {
+        const yearSelect = document.getElementById("yearSelect");
+        const classSelect = document.getElementById("classSelect");
+
+        if (yearSelect && classSelect) {
+            yearSelect.addEventListener("change", function() {
+                const selectedYear = this.value;
+                classSelect.innerHTML = '<option value="">Đang tải...</option>';
+
+                fetch(`load_classes_by_year.php?year=${encodeURIComponent(selectedYear)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        classSelect.innerHTML = '<option value="">Chọn lớp</option>';
+                        if (data.length === 0) {
+                            classSelect.innerHTML += '<option value="">Không có lớp trong năm học này</option>';
+                        } else {
+                            data.forEach(cls => {
+                                const option = document.createElement("option");
+                                option.value = cls.id;
+                                option.textContent = `${cls.class_name} (Khối ${cls.grade})`;
+                                classSelect.appendChild(option);
+                            });
+                        }
+                    })
+                    .catch(err => {
+                        classSelect.innerHTML = '<option value="">Lỗi tải dữ liệu</option>';
+                        console.error(err);
+                    });
+            });
+        }
+    });
+
     </script>
 </body>
 </html>

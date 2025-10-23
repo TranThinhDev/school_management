@@ -60,14 +60,14 @@ if (isset($_POST['add_student'])) {
     
     try {
         // Kiểm tra xem học sinh đã có lớp chưa
-        $stmt = $pdo->prepare("SELECT id FROM class_students WHERE student_id = ? AND school_year = ?");
+        $stmt = $pdo->prepare("SELECT id FROM class_students WHERE student_id = ? AND school_year = ? ");
         $stmt->execute([$student_id, $school_year]);
 
         if ($stmt->fetch()) {
             $_SESSION['error'] = "Học sinh đã có lớp!";
         } else {
             $stmt = $pdo->prepare("INSERT INTO class_students (student_id, class_id, school_year) VALUES (?, ?, ?)");
-            $stmt->execute([$student_id, $class_id, '2024-2025']);
+            $stmt->execute([$student_id, $class_id, $school_year]);
             $_SESSION['success'] = "Thêm học sinh vào lớp thành công!";
             header("Location: class_students.php?id=" . $class_id);
             exit();

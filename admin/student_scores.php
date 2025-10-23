@@ -10,6 +10,7 @@ if (!isset($_GET['id'])) {
 }
 
 $student_id = $_GET['id'];
+$school_year = $_GET['school_year'];
 
 // Lấy thông tin học sinh
 $stmt = $pdo->prepare("
@@ -17,9 +18,9 @@ $stmt = $pdo->prepare("
     FROM users u 
     LEFT JOIN class_students cs ON u.id = cs.student_id 
     LEFT JOIN classes c ON cs.class_id = c.id 
-    WHERE u.id = ? AND u.role = 'student'
+    WHERE u.id = ?  and cs.status = 'active' and cs.school_year = ?
 ");
-$stmt->execute([$student_id]);
+$stmt->execute([$student_id,$school_year]);
 $student = $stmt->fetch();
 
 if (!$student) {
@@ -34,10 +35,10 @@ $stmt = $pdo->prepare("
     FROM scores s 
     JOIN subjects sj ON s.subject_id = sj.id 
     JOIN classes c ON s.class_id = c.id 
-    WHERE s.student_id = ? 
+    WHERE s.student_id = ? and s.school_year = ?
     ORDER BY s.semester, sj.subject_name
 ");
-$stmt->execute([$student_id]);
+$stmt->execute([$student_id, $school_year]);
 $scores = $stmt->fetchAll();
 ?>
 
